@@ -45,7 +45,7 @@ def runHotcellAnalysis(spark: SparkSession, pointPath: String): DataFrame =
   val numCells = (maxX - minX + 1)*(maxY - minY + 1)*(maxZ - minZ + 1)
 
   
-  pickupInfo = spark.sql("select x,y,z from pickupInfoView where x>= ${minX} and x<= ${maxX} and y>= ${minY} and y<= ${maxY} and z>= ${minZ} and z<= ${maxZ}")
+  pickupInfo = spark.sql(s"select x,y,z from pickupInfoView where x>= ${minX} and x<= ${maxX} and y>= ${minY} and y<= ${maxY} and z>= ${minZ} and z<= ${maxZ}")
   
   pickupInfo = pickupInfo.groupBy("x", "y", "z").count()
   
