@@ -47,6 +47,14 @@ object HotcellUtils {
     return calendar.get(Calendar.DAY_OF_MONTH)
   }
 
-  // YOU NEED TO CHANGE THIS PART
+  def ST_Within(x1:Int, y1:Int, z1:Int, x2:Int, y2:Int, z2:Int): Boolean = 
+  {
+    return !(math.abs(x1-x2)>1 || math.abs(y1-y2)>1 || math.abs(z1-z2)>1)
+  }
+
+  def gScore(average:Double, standard_deviation:Double, numCells:Double, sum:Int, weight:Int): Double =
+  {
+    return (sum - average*weight) / (standard_deviation*math.sqrt((numCells*weight- weight*weight)/(numCells-1)))
+  }
 
 }

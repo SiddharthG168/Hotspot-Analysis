@@ -32,6 +32,7 @@ def runHotcellAnalysis(spark: SparkSession, pointPath: String): DataFrame =
   pickupInfo = spark.sql("select CalculateX(nyctaxitrips._c5),CalculateY(nyctaxitrips._c5), CalculateZ(nyctaxitrips._c1) from nyctaxitrips")
   var newCoordinateName = Seq("x", "y", "z")
   pickupInfo = pickupInfo.toDF(newCoordinateName:_*)
+  pickupInfo.createOrReplaceTempView("pickupInfoView")
   pickupInfo.show()
 
   // Define the min and max of x, y, z
@@ -43,9 +44,25 @@ def runHotcellAnalysis(spark: SparkSession, pointPath: String): DataFrame =
   val maxZ = 31
   val numCells = (maxX - minX + 1)*(maxY - minY + 1)*(maxZ - minZ + 1)
 
-  // YOU NEED TO CHANGE THIS PART
   
-
-  return pickupInfo // YOU NEED TO CHANGE THIS PART
+  pickupInfo = spark.sql("select x,y,z from pickupInfoView where x>= ${minX} and x<= ${maxX} and y>= ${minY} and y<= ${maxY} and z>= ${minZ} and z<= ${maxZ}")
+  
+  pickupInfo = pickupInfo.groupBy("x", "y", "z").count()
+  
+  val average: Double = pickupInfo.agg(sum("count") / numCells).first.getDouble(0)
+  val standard_deviation: Double = math.sqrt(pickupInfo.agg(sum(pow("count", 2.0)) / numCells - math.pow(average, 2.0)).first.getDouble(0))
+  
+  pickupInfo.createOrReplaceTempView("hotcells")
+  
+  spark.udf.register("ST_Within", (x1: Int, y1: Int, z1: Int, x2: Int, y2: Int, z2: Int) => (HotcellUtils.ST_Within(x1, y1, z1, x2, y2, z2)))
+  var self_join = spark.sql("select hc1.x as x, hc1.y as y, hc1.z as z, hc2.count as count, 1 as neighbour from hotcells hc1, hotcells hc2 where ST_Within(hc1.x, hc1.y, hc1.z, hc2.x, hc2.y, hc2.z)")
+  self_join = self_join.groupBy("x", "y", "z").sum("count","neighbour")
+  self_join = self_join.toDF(Seq("x", "y", "z", "sum", "weight"): _*)
+  self_join.createOrReplaceTempView("selfJoin")
+    
+  spark.udf.register("gScore", (sum: Int, weight:Int) => HotcellUtils.gScore(average, standard_deviation, numCells, sum, weight))
+  var getgScore = spark.sql("select x, y, z, gScore(sum, weight) as score from selfJoin")
+    
+  return getgScore.sort(desc("score")).limit(50).select("x","y","z")
 }
 }
